@@ -23,6 +23,21 @@ ORDER BY cost DESC
 SELECT FLOOR(Count(id) * 0.05) FROM placed_order
 
 
+--QUERY B REVISAR
+SELECT DISTINCT cty.*
+    FROM
+    (SELECT delivery_city_id AS id, d.dly
+        FROM placed_order AS po
+        JOIN 
+        (SELECT placed_order_id AS poid, (delivery_time_actual - delivery_time_planned) AS dly
+            FROM delivery
+            WHERE (delivery_time_actual > delivery_time_planned)) AS d
+            ON po.id = d.poid
+        ORDER BY d.dly DESC) AS d2
+	NATURAL JOIN city AS cty
+LIMIT 5;
+
+
 --QUERY C
 SELECT c.*
     FROM customer AS c
@@ -32,3 +47,27 @@ SELECT c.*
         GROUP BY customer_id) AS count
     ORDER BY qty DESC
 LIMIT 10;
+
+
+--Probar si DENSE_RANK asi nos da lo que necesitamos
+--QUERY D
+SELECT i.*
+    FROM item AS i
+    JOIN order_item AS oi
+        ON i.id = oi.item_id
+    JOIN placed_order AS po
+        ON oi.placed_order_id = po.id
+    JOIN
+    (SELECT placed_order_id
+        FROM (SELECT placed_order_id, DENSE_RANK() OVER (ORDER BY (delivery_time_actual - delivery_time_planned) DESC) AS rnk
+                FROM delivery
+                WHERE (delivery_time_actual > delivery_time_planned)) AS dt
+        WHERE rnk = 1) AS dt_rnk
+        ON dt_rnk.placed_order_id = po.id
+
+--Rankeamos ordenes por tamano del intervalo de retraso
+SELECT placed_order_id
+    FROM (SELECT placed_order_id, DENSE_RANK() OVER (ORDER BY (delivery_time_actual - delivery_time_planned) DESC) AS rnk
+            FROM delivery
+            WHERE (delivery_time_actual > delivery_time_planned))
+    WHERE rnk = 1
