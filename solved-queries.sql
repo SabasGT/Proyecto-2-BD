@@ -26,17 +26,24 @@ SELECT FLOOR(Count(id) * 0.05) FROM placed_order
 --QUERY B REVISAR
 SELECT DISTINCT cty.*
     FROM
-    (SELECT delivery_city_id AS id, d.dly
+    (SELECT delivery_city_id AS id, AVG(d.delay) AS avg_delay
         FROM placed_order AS po
         JOIN 
-        (SELECT placed_order_id AS poid, (delivery_time_actual - delivery_time_planned) AS dly
+        (SELECT placed_order_id AS poid, (delivery_time_actual - delivery_time_planned) AS delay
             FROM delivery
             WHERE (delivery_time_actual > delivery_time_planned)) AS d
             ON po.id = d.poid
-        ORDER BY d.dly DESC) AS d2
+        GROUP BY delivery_city_id
+        ORDER BY avg_delay) AS d2
 	NATURAL JOIN city AS cty
 LIMIT 5;
 
+
+(SELECT placed_order_id AS poid, (delivery_time_actual - delivery_time_planned) AS delay
+            FROM delivery
+            WHERE (delivery_time_actual > delivery_time_planned)) AS d
+            ON po.id = d.poid
+        ORDER BY d.delay DESC)
 
 --QUERY C
 SELECT c.*
@@ -52,22 +59,22 @@ LIMIT 10;
 --Probar si DENSE_RANK asi nos da lo que necesitamos
 --QUERY D
 SELECT i.*
-    FROM item AS i
+    FROM placed_order AS po
     JOIN order_item AS oi
+        ON po.id = oi.placed_order_id
+    JOIN item AS i
         ON i.id = oi.item_id
-    JOIN placed_order AS po
-        ON oi.placed_order_id = po.id
     JOIN
     (SELECT placed_order_id
         FROM (SELECT placed_order_id, DENSE_RANK() OVER (ORDER BY (delivery_time_actual - delivery_time_planned) DESC) AS rnk
                 FROM delivery
-                WHERE (delivery_time_actual > delivery_time_planned)) AS dt
+                WHERE delivery_time_actual > delivery_time_planned) AS dt
         WHERE rnk = 1) AS dt_rnk
         ON dt_rnk.placed_order_id = po.id
 
---Rankeamos ordenes por tamano del intervalo de retraso
+--Rankeamos ordenes por tamano del intervalo de retraso y agarramos las que tienen rango 1
 SELECT placed_order_id
     FROM (SELECT placed_order_id, DENSE_RANK() OVER (ORDER BY (delivery_time_actual - delivery_time_planned) DESC) AS rnk
             FROM delivery
-            WHERE (delivery_time_actual > delivery_time_planned))
+            WHERE delivery_time_actual > delivery_time_planned)
     WHERE rnk = 1
